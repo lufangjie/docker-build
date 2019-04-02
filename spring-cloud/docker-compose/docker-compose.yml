@@ -1,0 +1,75 @@
+version: '3'
+# 由于一组Compose的服务通讯需要使用service的名称进行访问，所以需要修改各个服务的配置文件，
+# 或者在配置文件中配置多环境，在执行run.sh时，指定环境参数
+# 修改前：
+# eureka.client.serviceUrl.defaultZone=http://localhost:9001/eureka
+# 修改后：
+# eureka.client.serviceUrl.defaultZone=http://eureka（对应eureka服务的名称）:9001/eureka
+services:
+  # 服务名称
+  eureka:
+    # 指定的镜像名称或ID
+    image: centos-jdk8
+    # 生成的container名称
+    container_name: eureka-server
+    volumes:
+      # 挂载jar包和运行脚本
+      - /usr/workspace/datacenter-server/build/docker-compose/jars/eureka-server-1.0.jar:/usr/local/eureka-server-1.0.jar
+      - /usr/workspace/datacenter-server/build/docker-compose/run.sh:/usr/local/run.sh
+    # 暴露端口，只将端口暴露给服务使用，不暴露给宿主机
+    expose:
+      - 9001
+    # 启动服务后执行的命令
+    command: ["sh", "/usr/local/run.sh", "eureka-server-1.0.jar", "docker"]
+  zuul:
+    image: centos-jdk8
+    container_name: zuul-server
+    volumes:
+      - /usr/workspace/datacenter-server/build/docker-compose/jars/service-zuul-0.0.1-SNAPSHOT.jar:/usr/local/service-zuul-0.0.1-SNAPSHOT.jar
+      - /usr/workspace/datacenter-server/build/docker-compose/run.sh:/usr/local/run.sh
+    # 暴露端口，并暴露给宿主机
+    ports:
+      - 8080:8080
+    command: ["sh", "/usr/local/run.sh", "service-zuul-0.0.1-SNAPSHOT.jar", "docker"]
+    # 启动服务的依赖顺序，如果以【docker-compose up zuul】方式启动【zuul】服务时，也会启动【eureka】服务
+    depends_on:
+      - eureka
+    # links:
+    #   - eureka
+  feign:
+    image: centos-jdk8
+    container_name: feign-server
+    volumes:
+      - /usr/workspace/datacenter-server/build/docker-compose/jars/service-feign-0.0.1-SNAPSHOT.jar:/usr/local/service-feign-0.0.1-SNAPSHOT.jar
+      - /usr/workspace/datacenter-server/build/docker-compose/run.sh:/usr/local/run.sh
+    expose:
+      - 9002
+    command: ["sh", "/usr/local/run.sh", "service-feign-0.0.1-SNAPSHOT.jar", "docker"]
+    depends_on:
+      - eureka
+  system:
+    image: centos-jdk8
+    container_name: system-server
+    volumes:
+      - /usr/workspace/datacenter-server/build/docker-compose/jars/service-system-0.0.1-SNAPSHOT.jar:/usr/local/service-system-0.0.1-SNAPSHOT.jar
+      - /usr/workspace/datacenter-server/build/docker-compose/run.sh:/usr/local/run.sh
+    expose:
+      - 9011
+    command: ["sh", "/usr/local/run.sh", "service-system-0.0.1-SNAPSHOT.jar", "docker"]
+    depends_on:
+      - eureka
+      - zuul
+      - feign
+  transport:
+    image: centos-jdk8
+    container_name: transport-server
+    volumes:
+      - /usr/workspace/datacenter-server/build/docker-compose/jars/service-transport-0.0.1-SNAPSHOT.jar:/usr/local/service-transport-0.0.1-SNAPSHOT.jar
+      - /usr/workspace/datacenter-server/build/docker-compose/run.sh:/usr/local/run.sh
+    expose:
+      - 9019
+    command: ["sh", "/usr/local/run.sh", "service-transport-0.0.1-SNAPSHOT.jar", "docker"]
+    depends_on:
+      - eureka
+      - zuul
+      - feign
